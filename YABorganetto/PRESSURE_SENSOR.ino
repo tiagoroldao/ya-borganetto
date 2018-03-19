@@ -20,26 +20,19 @@ float baselinePressure;
 // readings
 float pressure = 0;
 float readingTime = 0;
-// Readings to compare to, for calculating momentum
-// Always younger than PREV_PRESSURE_MIN_AGE * 2, always older than PREV_PRESSURE_MIN_AGE
 float prevPressure = 0;
 float prevReadingTime = 0;
-// Reading that will replace old ones
-// Replace readings when PREV_PRESSURE_MIN_AGE is passed
-float prevPressureTemp = 0;
-float prevReadingTimeTemp = 0;
 
 void readPressureSensor () {
-  pressure = bme.readPressure();
-  readingTime = millis();
+  float newPressure = bme.readPressure();
+  float newReadingTime = millis();
 
-  if (readingTime - prevReadingTimeTemp > PREV_PRESSURE_MIN_AGE ||
-      (pressure > baselinePressure && prevPressure < baselinePressure) ||
-      (pressure < baselinePressure && prevPressure > baselinePressure)) {
-    prevReadingTime = prevReadingTimeTemp;
-    prevPressure = prevPressureTemp;
-    prevPressureTemp = pressure;
-    prevReadingTimeTemp = readingTime;
+  if (pressure != newPressure) {
+    prevReadingTime = readingTime;
+    prevPressure = pressure;
+    pressure = newPressure;
+    readingTime = newReadingTime;
+    //graphPressure();
   }
 }
 
@@ -49,7 +42,7 @@ void setupPressureSensor () {
   while (!bme.begin()) {
     retryCount++;
 
-    if (retryCount >= 10) {
+    if (retryCount >= 20) {
       Serial.println("Could not find a valid BMP280 sensor, check wiring!");
       while (1);
     }
@@ -69,6 +62,7 @@ void setupPressureSensor () {
       initPressure = pressure;
       measure = pressure;
       measureCount = 1;
+      Serial.println("Baseline measuring failure!");
     }
     else {
       measure += pressure;
@@ -76,13 +70,17 @@ void setupPressureSensor () {
     }
     delay(25);
   }
+  Serial.println("BaselinePressure done!");
 
   baselinePressure = measure / BASELINE_PRESSURE_READ_COUNT;
-  Serial.println("Successfully measured baseline pressure as " + String(baselinePressure));
 }
 
 float getPressure () {
   return pressure;
+}
+
+float getPrevRelativePressure () {
+  return baselinePressure - prevPressure;
 }
 
 float getRelativePressure () {
@@ -90,7 +88,13 @@ float getRelativePressure () {
 }
 
 float getRelativePressurePrediction (int timePast) {
-//  Serial.println("prediction");
-  float delta = (pressure - prevPressure) / (readingTime - prevReadingTime) * timePast;
+  float delta = ((prevPressure - pressure) / (readingTime - prevReadingTime)) * timePast;
   return baselinePressure - pressure + delta;
+}
+
+void graphPressure () {
+    Serial.print("600 0 -600 40 -40 90 -90 ");
+    Serial.print(constrain(getRelativePressurePrediction(50), -600, 600));
+    Serial.print(" ");
+    Serial.println(constrain(getRelativePressure(), -600, 600));
 }

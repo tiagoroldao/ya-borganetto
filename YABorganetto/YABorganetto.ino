@@ -5,10 +5,10 @@ void setup() {
   Serial.println("Boot starting");
   setupPressureSensor();
   setupButtons();
-  setupMIDI();
+  setupNotes();
 }
 
 void loop() {
   readPressureSensor();
-  readButtons();
+  updateNotes();
 }
